@@ -118,7 +118,7 @@ const DISCLAIMER_AGREED_KEY = 'disclaimer_agreed'
 // Protected route wrapper
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, setAuth, clearAuth, token: storeToken, _hasHydrated } = useAuthStore()
-  const { hiddenMenuKeys, isExeMode, setHiddenMenuKeys, setIsExeMode } = useMenuVisibilityStore()
+  const { hiddenMenuKeys, isExeMode, setHiddenMenuKeys, setIsExeMode, setAdsEnabled } = useMenuVisibilityStore()
   const location = useLocation()
   const [authState, setAuthState] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking')
   const [disclaimerState, setDisclaimerState] = useState<'checking' | 'agreed' | 'pending'>('checking')
@@ -186,15 +186,18 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
               setDisclaimerSettings(normalizeDisclaimerSettings(settingsResult.data))
               setIsExeMode(Boolean(settingsResult.data['runtime.is_exe_mode']))
               setHiddenMenuKeys(getHiddenMenuKeysFromSettings(settingsResult.data))
+              setAdsEnabled(Boolean(settingsResult.data['ads.enabled']))
             } else {
               setDisclaimerSettings(normalizeDisclaimerSettings())
               setIsExeMode(false)
               setHiddenMenuKeys([])
+              setAdsEnabled(false)
             }
           } catch {
             setDisclaimerSettings(normalizeDisclaimerSettings())
             setIsExeMode(false)
             setHiddenMenuKeys([])
+            setAdsEnabled(false)
           } finally {
             setMenuState('ready')
           }
@@ -213,7 +216,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     }
 
     checkAuth()
-  }, [_hasHydrated, isAuthenticated, storeToken, setAuth, clearAuth, setHiddenMenuKeys, setIsExeMode])
+  }, [_hasHydrated, isAuthenticated, storeToken, setAuth, clearAuth, setHiddenMenuKeys, setIsExeMode, setAdsEnabled])
 
   // 同意免责声明
   const handleAgreeDisclaimer = async () => {

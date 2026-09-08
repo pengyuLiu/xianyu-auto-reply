@@ -30,6 +30,12 @@ FROM nginx:alpine
 # 配置国内镜像源
 RUN sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories
 
+# 设置时区为上海并安装 tzdata
+RUN apk add --no-cache tzdata \
+    && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+    && echo "Asia/Shanghai" > /etc/timezone \
+    && rm -rf /var/cache/apk/*
+
 # 复制nginx配置
 COPY docker/frontend/nginx.conf /etc/nginx/conf.d/default.conf
 

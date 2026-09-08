@@ -90,6 +90,8 @@ DEFAULT_SYSTEM_SETTINGS: dict[str, tuple[str, str | None]] = {
     "token.api_mode": ("web", "Token获取方式：web-网页接口/remote-远程接口"),
     "token.remote_url": ("", "Token远程接口URL"),
     "token.remote_secret_key": ("", "Token远程接口秘钥"),
+    # 广告展示开关：是否展示仪表盘广告与广告相关菜单，默认关闭
+    "ads.enabled": ("false", "是否展示广告（true/false），默认关闭"),
 }
 
 # 不需要XSS转义的键（布尔值、数字等）
@@ -135,6 +137,8 @@ NO_ESCAPE_KEYS = {
     # 远程过滑块配置：URL 含 :// 等字符、秘钥为随机串，均不能被 XSS 转义
     "captcha.remote_service_url",
     "captcha.remote_secret_key",
+    # 广告展示开关：布尔字符串"true"/"false"，无需转义
+    "ads.enabled",
     # 是否传递账号Cookie：布尔字符串"true"/"false"，无需转义
     "captcha.remote_pass_cookies",
     "captcha.block_remote_calls",

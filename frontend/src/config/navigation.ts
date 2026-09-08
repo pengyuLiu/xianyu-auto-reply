@@ -67,6 +67,8 @@ export interface FirstLevelMenuOption {
 
 export const HIDDEN_MENU_SETTING_KEY = 'navigation.hidden_menu_keys'
 export const EXE_FORCED_HIDDEN_MENU_KEYS = ['product-publish'] as const
+// 当广告展示开关关闭时需隐藏的菜单项 key（管理员广告菜单 + 底部广告申请）
+export const ADS_RELATED_MENU_KEYS: readonly string[] = ['admin-advertising', 'ad-apply']
 
 const EXE_BLOCKED_PATH_PREFIXES = ['/accounts/shared-scan', '/shared-scan']
 

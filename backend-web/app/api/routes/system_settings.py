@@ -85,6 +85,8 @@ NON_ADMIN_ALLOWED_KEYS = {
     "distribution.fee_rate",
     "withdraw.min_amount",
     "runtime.is_exe_mode",
+    # 广告展示开关：普通用户亦需读取以隐藏仪表盘广告
+    "ads.enabled",
     # 普通用户需读取续期单价以在个人设置中计算续期总价
     "user.renew_month_price",
 }

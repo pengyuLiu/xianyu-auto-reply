@@ -6,6 +6,7 @@ import { type AdminStats, type TodayStats, getAdminStats, getTodayStats } from '
 import { getPublicAds, type Advertisement } from '@/api/advertisements'
 import { useUIStore } from '@/store/uiStore'
 import { useAuthStore } from '@/store/authStore'
+import { useMenuVisibilityStore } from '@/store/menuVisibilityStore'
 import { OrderAmountChart } from '@/components/common/OrderAmountChart'
 
 interface DashboardStats {
@@ -28,6 +29,7 @@ interface AdsData {
 export function Dashboard() {
   const { addToast } = useUIStore()
   const { isAuthenticated, token, _hasHydrated, user } = useAuthStore()
+  const { adsEnabled } = useMenuVisibilityStore()
   const [statsLoading, setStatsLoading] = useState(true)
   const [adminStatsLoading, setAdminStatsLoading] = useState(true)
   const [adsLoading, setAdsLoading] = useState(true)
@@ -101,6 +103,12 @@ export function Dashboard() {
 
   /** 加载广告数据 */
   const loadAds = async () => {
+    // 展示广告开关关闭时不请求广告数据
+    if (!adsEnabled) {
+      setAdsData({ carousel: [], text: [] })
+      setAdsLoading(false)
+      return
+    }
     try {
       setAdsLoading(true)
       const adsResult = await getPublicAds()
@@ -121,13 +129,15 @@ export function Dashboard() {
     // 异步独立加载各个模块，不互相等待
     loadStats()
     loadAdminStats()
-    loadAds()
+    if (adsEnabled) {
+      loadAds()
+    }
   }
 
   useEffect(() => {
     if (!_hasHydrated || !isAuthenticated || !token) return
     loadDashboard()
-  }, [_hasHydrated, isAuthenticated, token])
+  }, [_hasHydrated, isAuthenticated, token, adsEnabled])
 
   // 轮播广告自动切换
   useEffect(() => {
@@ -272,7 +282,8 @@ export function Dashboard() {
         )}
       </div>
 
-      {/* 广告模块 */}
+      {/* 广告模块（展示广告开关开启时显示） */}
+      {adsEnabled && (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -423,6 +434,7 @@ export function Dashboard() {
           </div>
         </div>
       </motion.div>
+      )}
 
       {/* Admin Stats - 管理员专属 */}
       {user?.is_admin && (

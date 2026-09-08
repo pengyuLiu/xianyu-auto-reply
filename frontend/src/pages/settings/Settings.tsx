@@ -53,7 +53,7 @@ import type {
 export function Settings() {
   const { addToast } = useUIStore()
   const { isAuthenticated, token, _hasHydrated, user } = useAuthStore()
-  const { isExeMode, setHiddenMenuKeys, setIsExeMode } = useMenuVisibilityStore()
+  const { isExeMode, setHiddenMenuKeys, setIsExeMode, setAdsEnabled } = useMenuVisibilityStore()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [loginBrandingSaving, setLoginBrandingSaving] = useState(false)
@@ -113,6 +113,7 @@ export function Settings() {
         setSettings(result.data)
         setIsExeMode(Boolean(result.data['runtime.is_exe_mode']))
         setHiddenMenuKeys(getHiddenMenuKeysFromSettings(result.data))
+        setAdsEnabled(Boolean(result.data['ads.enabled']))
       }
       // 加载群二维码
       const [wechatRes, qqRes, wechatOfficialRes, telegramRes, rewardRes] = await Promise.all([
@@ -161,6 +162,7 @@ export function Settings() {
       if (result.success) {
         applyThemeSettings(settings)
         setHiddenMenuKeys(getHiddenMenuKeysFromSettings(settings))
+        setAdsEnabled(Boolean(settings['ads.enabled']))
         addToast({ type: 'success', message: '设置保存成功' })
       } else {
         addToast({ type: 'error', message: result.message || '保存失败' })
@@ -681,6 +683,20 @@ export function Settings() {
                     type="checkbox"
                     checked={Boolean(settings?.['account.face_verify_timeout_disable'] ?? true)}
                     onChange={(e) => setSettings(s => s ? { ...s, 'account.face_verify_timeout_disable': e.target.checked } : null)}
+                  />
+                  <span className="switch-slider"></span>
+                </label>
+              </div>
+              <div className="flex items-center justify-between py-3 border-t border-slate-100 dark:border-slate-700">
+                <div>
+                  <p className="font-medium text-slate-900 dark:text-slate-100">展示广告</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">关闭后仪表盘不再展示推荐/文字广告，并隐藏广告相关菜单</p>
+                </div>
+                <label className="switch-ios">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(settings?.['ads.enabled'] ?? false)}
+                    onChange={(e) => setSettings(s => s ? { ...s, 'ads.enabled': e.target.checked } : null)}
                   />
                   <span className="switch-slider"></span>
                 </label>

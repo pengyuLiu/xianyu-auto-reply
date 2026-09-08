@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import {
+  ADS_RELATED_MENU_KEYS,
   adminNavItems,
   bottomNavItems,
   getVisibleBottomNavItems,
@@ -40,7 +41,7 @@ interface SidebarProps {
 
 export function Sidebar({ systemName = '闲鱼管理系统' }: SidebarProps) {
   const { user } = useAuthStore()
-  const { hiddenMenuKeys, isExeMode } = useMenuVisibilityStore()
+  const { hiddenMenuKeys, isExeMode, adsEnabled } = useMenuVisibilityStore()
   const { sidebarCollapsed, sidebarMobileOpen, setSidebarMobileOpen, setSidebarCollapsed } = useUIStore()
   const { currentVersion, fetchCurrentVersion } = useVersionStore()
   const location = useLocation()
@@ -51,12 +52,14 @@ export function Sidebar({ systemName = '闲鱼管理系统' }: SidebarProps) {
     [hiddenMenuKeys, isAdmin, isExeMode]
   )
   const visibleAdminNavItems = useMemo(
-    () => getVisibleNavEntries(adminNavItems, hiddenMenuKeys, isAdmin, isExeMode),
-    [hiddenMenuKeys, isAdmin, isExeMode]
+    () => getVisibleNavEntries(adminNavItems, hiddenMenuKeys, isAdmin, isExeMode)
+      .filter((entry) => adsEnabled || !ADS_RELATED_MENU_KEYS.includes(entry.key)),
+    [hiddenMenuKeys, isAdmin, isExeMode, adsEnabled]
   )
   const visibleBottomNavItems = useMemo(
-    () => getVisibleBottomNavItems(bottomNavItems, hiddenMenuKeys, isAdmin, isExeMode),
-    [hiddenMenuKeys, isAdmin, isExeMode]
+    () => getVisibleBottomNavItems(bottomNavItems, hiddenMenuKeys, isAdmin, isExeMode)
+      .filter((item) => adsEnabled || !ADS_RELATED_MENU_KEYS.includes(item.key)),
+    [hiddenMenuKeys, isAdmin, isExeMode, adsEnabled]
   )
 
   // 展开的分组菜单 - 使用 Set 来避免重复添加触发重渲染
