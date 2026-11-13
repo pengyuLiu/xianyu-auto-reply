@@ -23,6 +23,7 @@ from app.services.xianyu.delivery_utils import (
     replace_order_context_variables as _replace_order_context_variables,
     recursive_replace_params
 )
+from app.services.xianyu.delivery_precheck import DeliveryPrecheckMixin
 from app.services.xianyu.yifan_api_handler import YifanApiHandler
 from common.db.compat import db_manager
 from common.services.order_service import OrderDetailService
@@ -41,7 +42,7 @@ SEND_BEFORE_CONFIRM_WAIT_TIMEOUT = float(os.getenv('SEND_BEFORE_CONFIRM_WAIT_TIM
 DELIVERY_AMOUNT_REFRESH_TIMEOUT = 15.0
 
 
-class AutoDeliveryHandler:
+class AutoDeliveryHandler(DeliveryPrecheckMixin):
     """自动发货处理器"""
     
     def __init__(self, parent):
@@ -478,12 +479,20 @@ class AutoDeliveryHandler:
             buyer_id=buyer_id,
         )
 
-    async def send_delivery_failure_notification(self, send_user_name, send_user_id, item_id, error_message, chat_id):
+    async def send_delivery_failure_notification(self, send_user_name, send_user_id, item_id, error_message,
+                                                 chat_id, order_id=None):
         """发送发货通知 - 直接调用NotificationManager"""
         try:
             from app.services.xianyu.notification_manager import NotificationManager
             notification_manager = NotificationManager(self.cookie_id)
-            return await notification_manager.send_delivery_failure_notification(send_user_name, send_user_id, item_id, error_message, chat_id)
+            return await notification_manager.send_delivery_failure_notification(
+                send_user_name,
+                send_user_id,
+                item_id,
+                error_message,
+                chat_id,
+                order_id=order_id,
+            )
         except Exception as e:
             logger.error(f"【{self.cookie_id}】发送发货通知失败: {self._safe_str(e)}")
     
@@ -576,7 +585,13 @@ class AutoDeliveryHandler:
 
             log_service = AutoReplyLogService(self.cookie_id)
             log_id = await log_service.record_message(log_payload)
-            logger.info(f"【{self.cookie_id}】自动发货消息日志已记录: 成功{success_count}/失败{fail_count}")
+            if log_id:
+                logger.info(f"【{self.cookie_id}】自动发货消息日志已记录: 成功{success_count}/失败{fail_count}")
+            else:
+                logger.error(
+                    f"【{self.cookie_id}】自动发货审计日志写入失败，未生成日志记录: "
+                    f"成功{success_count}/失败{fail_count}"
+                )
 
             # 发出成功且日志写入成功时，处理服务端响应并回写发送状态
             if log_id and not any_send_failed and pending_send_waiters:
@@ -1679,6 +1694,7 @@ class AutoDeliveryHandler:
                                         send_user_name, send_user_id, item_id,
                                         send_before_confirm_fail_msg,
                                         chat_id,
+                                        order_id=order_id,
                                     )
                             else:
                                 send_before_confirm_fail_msg = "⚠️ 卡券已发送成功，但自动确认发货已关闭，请手动确认发货"
@@ -1690,6 +1706,7 @@ class AutoDeliveryHandler:
                                 send_user_name, send_user_id, item_id,
                                 send_before_confirm_fail_msg,
                                 chat_id,
+                                order_id=order_id,
                             )
                         elif send_before_confirm_active and any_send_failed:
                             send_before_confirm_fail_msg = "⚠️ 卡券发送存在失败，已跳过确认发货，请检查买家是否收到完整内容后手动确认发货"
@@ -1698,6 +1715,7 @@ class AutoDeliveryHandler:
                                 send_user_name, send_user_id, item_id,
                                 send_before_confirm_fail_msg,
                                 chat_id,
+                                order_id=order_id,
                             )
 
                         # 后置确认流程结束后再做一次终态复查，覆盖开关在最后几步才开启的窗口。
@@ -1730,13 +1748,17 @@ class AutoDeliveryHandler:
                                     send_user_name, send_user_id, item_id,
                                     card_only_send_fail_msg,
                                     chat_id,
+                                    order_id=order_id,
                                 )
 
                         # 如果有消息发送失败，额外发通知告知（不影响订单状态）
                         if any_send_failed:
                             fail_notify_msg = "部分发货消息发送失败（WebSocket连接断开），请检查买家是否收到完整内容"
                             logger.error(f'[{msg_time}] 【{self.cookie_id}】订单 {order_id} {fail_notify_msg}')
-                            await self.send_delivery_failure_notification(send_user_name, send_user_id, item_id, fail_notify_msg, chat_id)
+                            await self.send_delivery_failure_notification(
+                                send_user_name, send_user_id, item_id, fail_notify_msg, chat_id,
+                                order_id=order_id,
+                            )
 
                         # 发送成功通知（仅 IM 通知，fail_reason 写库延后到 update_order_delivery_info 之后，
                         # 否则会被 update_order_delivery_info 内部的 delivery_fail_reason=None 清空）
@@ -1748,6 +1770,7 @@ class AutoDeliveryHandler:
                                 f"⚠️ 对接卡券暂不支持多数量发货：订单数量 {quantity_to_send} 张，"
                                 f"已自动发送 {len(delivery_contents)} 张，剩余 {remaining} 张请手动补发或改用自有卡券",
                                 chat_id,
+                                order_id=order_id,
                             )
                         elif quantity_degraded_for_fixed_content:
                             # text/image 固定内容卡券退化场景：商家应改用 data/api 类型卡券支持多数量
@@ -1758,6 +1781,7 @@ class AutoDeliveryHandler:
                                 f"订单数量 {quantity_to_send} 张，仅发送 1 张固定内容（剩余 {remaining} 张未发）。"
                                 f"如需多数量发送不同卡密，请改用 data 或 api 类型卡券",
                                 chat_id,
+                                order_id=order_id,
                             )
                         elif only_send_card_result:
                             if not card_only_send_fail_msg:
@@ -1773,11 +1797,19 @@ class AutoDeliveryHandler:
                                     item_id,
                                     card_only_success_msg,
                                     chat_id,
+                                    order_id=order_id,
                                 )
                         elif len(delivery_contents) > 1:
-                            await self.send_delivery_failure_notification(send_user_name, send_user_id, item_id, f"多数量发货成功，共发送 {len(delivery_contents)} 个卡券", chat_id)
+                            await self.send_delivery_failure_notification(
+                                send_user_name, send_user_id, item_id,
+                                f"多数量发货成功，共发送 {len(delivery_contents)} 个卡券", chat_id,
+                                order_id=order_id,
+                            )
                         else:
-                            await self.send_delivery_failure_notification(send_user_name, send_user_id, item_id, "发货成功", chat_id)
+                            await self.send_delivery_failure_notification(
+                                send_user_name, send_user_id, item_id, "发货成功", chat_id,
+                                order_id=order_id,
+                            )
                         
                         # 更新订单状态和发货信息（不受消息发送结果影响）
                         # card_only 场景：订单已被关闭，仅记录补发卡券内容，不动 status / fail_reason
@@ -1898,7 +1930,10 @@ class AutoDeliveryHandler:
                             # 更新订单发货失败原因
                             await self._update_delivery_fail_reason(order_id, fail_msg)
                             # 发送自动发货失败通知
-                            await self.send_delivery_failure_notification(send_user_name, send_user_id, item_id, fail_msg, chat_id)
+                            await self.send_delivery_failure_notification(
+                                send_user_name, send_user_id, item_id, fail_msg, chat_id,
+                                order_id=order_id,
+                            )
 
                 except Exception as e:
                     fail_msg = f"自动发货处理异常: {str(e)}"
@@ -1914,7 +1949,10 @@ class AutoDeliveryHandler:
                         # 更新订单发货失败原因
                         await self._update_delivery_fail_reason(order_id, fail_msg)
                         # 发送自动发货异常通知
-                        await self.send_delivery_failure_notification(send_user_name, send_user_id, item_id, fail_msg, chat_id)
+                        await self.send_delivery_failure_notification(
+                            send_user_name, send_user_id, item_id, fail_msg, chat_id,
+                            order_id=order_id,
+                        )
 
                 logger.info(f'[{msg_time}] 【{self.cookie_id}】自动发货处理完成: {lock_key}')
             
@@ -3429,210 +3467,6 @@ class AutoDeliveryHandler:
             return -1
 
     # ==================== 禁止发货统一拦截入口 ====================
-
-    async def pre_delivery_check_and_close(
-        self,
-        websocket,
-        order_no: str,
-        buyer_id: str,
-        chat_id: str | None = None,
-        log_prefix: str = '',
-        item_id: str | None = None,
-    ) -> dict:
-        """禁止发货预检查 + 主动关闭订单（统一收口入口）
-
-        所有发货入口（手动发货 / 定时补发货 / 消息触发自动发货 / 卡片更新 / 小刀
-        卡片 / 重发货关键字）调用此方法即可获得一致的拦截行为。
-
-        流程（规则引擎化）：
-          1. 从 xy_delivery_block_rules 表加载该账号所有已启用规则（按 priority 排序）
-          2. 无已启用规则 → 直接放行 action='allow'
-          3. 逐条执行规则检查：
-             - 每条规则先检查自己的排除商品列表，命中则跳过本规则
-             - 规则检查通过 → 继续下一条
-             - 规则命中 → 执行拦截动作（发消息/写fail_reason/关单）
-          4. 首条命中即停，用该规则自己的配置决定后续动作
-          5. 全部通过 → 放行 action='allow'
-
-        Args:
-            websocket: 用于向买家发送禁止发货提示消息的 WebSocket 连接
-            order_no: 订单号
-            buyer_id: 买家用户ID
-            chat_id: 聊天会话ID（缺失时不发消息但仍拦截 + 关闭订单）
-            log_prefix: 日志前缀
-            item_id: 当前订单对应的商品ID
-
-        Returns:
-            {
-                'action': 'allow' | 'block' | 'card_only',
-                'blocked': bool,             # 仅在 action=='block' 时为 True
-                'reason_text': str,          # 配置的禁止发货原因
-                'fail_record': str,          # 写入 delivery_fail_reason 的文案
-                'auto_close_enabled': bool,  # 是否开启了主动关闭订单
-                'order_closed': bool,        # 关闭订单是否成功
-                'only_card_enabled': bool,   # 是否开启"关闭订单后继续发货"
-                'total_count': int,          # 兼容字段（-1 表示未使用旧逻辑）
-                'rule_code': str | None,     # 命中的规则编码
-                'rule_name': str | None,     # 命中的规则名称
-            }
-        """
-        pf = log_prefix or f'【{self.cookie_id}】'
-
-        # 获取买家闲鱼昵称（明文），存到实例属性供后续写入订单
-        self._current_buyer_fish_nick = None
-        if chat_id:
-            try:
-                from common.utils.fish_nick_utils import get_buyer_fish_nick
-                from common.utils.cookie_refresh import get_account_by_identity
-                from common.db.session import async_session_maker
-
-                latest_cookies = self.cookies_str
-                try:
-                    async with async_session_maker() as db_session:
-                        account = await get_account_by_identity(self.cookie_id, session=db_session)
-                        if account and account.cookie:
-                            latest_cookies = account.cookie
-                            if latest_cookies != self.cookies_str:
-                                self.cookies_str = latest_cookies
-                                from common.utils.xianyu_utils import trans_cookies
-                                self.cookies = trans_cookies(latest_cookies)
-                except Exception as db_e:
-                    logger.warning(f'{pf}从数据库获取最新Cookie失败，使用内存Cookie: {db_e}')
-
-                self._current_buyer_fish_nick = await get_buyer_fish_nick(
-                    latest_cookies, chat_id, self.cookie_id
-                )
-            except Exception as nick_e:
-                logger.warning(f'{pf}获取买家闲鱼昵称失败（不影响发货流程）: {nick_e}')
-
-        # 查询账号所属用户ID与主键（供按用户维度判断的规则使用，如"买家在同用户其他账号已有订单"）
-        account_owner_id = None
-        account_pk = None
-        try:
-            from common.utils.cookie_refresh import get_account_by_identity
-            from common.db.session import async_session_maker
-
-            async with async_session_maker() as owner_session:
-                _acc = await get_account_by_identity(self.cookie_id, session=owner_session)
-                if _acc:
-                    account_owner_id = _acc.owner_id
-                    account_pk = _acc.id
-        except Exception as owner_e:
-            logger.warning(f'{pf}查询账号owner_id失败（不影响按账号维度的规则）: {self._safe_str(owner_e)}')
-
-        # 调用规则引擎执行检查
-        try:
-            from app.services.xianyu.delivery_rules.rule_engine import execute_rules
-
-            engine_result = await execute_rules(
-                cookie_id=self.cookie_id,
-                cookies_str=self.cookies_str,
-                order_no=order_no,
-                buyer_id=buyer_id,
-                item_id=item_id,
-                chat_id=chat_id,
-                log_prefix=pf,
-                account_pk=account_pk,
-                owner_id=account_owner_id,
-            )
-        except Exception as e:
-            logger.error(f'{pf}规则引擎执行异常: {self._safe_str(e)}，放行')
-            return {
-                'action': 'allow',
-                'blocked': False,
-                'reason_text': '',
-                'fail_record': '',
-                'auto_close_enabled': False,
-                'order_closed': False,
-                'only_card_enabled': False,
-                'total_count': -1,
-                'rule_code': None,
-                'rule_name': None,
-                'buyer_fish_nick': self._current_buyer_fish_nick,
-            }
-
-        # 未命中任何规则 → 放行
-        if not engine_result.get('hit'):
-            return {
-                'action': 'allow',
-                'blocked': False,
-                'reason_text': '',
-                'fail_record': '',
-                'auto_close_enabled': False,
-                'order_closed': False,
-                'only_card_enabled': False,
-                'total_count': -1,
-                'rule_code': None,
-                'rule_name': None,
-                'buyer_fish_nick': self._current_buyer_fish_nick,
-            }
-
-        # 命中规则 → 执行拦截动作
-        rule_code = engine_result.get('rule_code', '')
-        rule_name = engine_result.get('rule_name', '')
-        block_reason = engine_result.get('block_reason', '')
-        auto_close_enabled = engine_result.get('auto_close_order', False)
-        only_card_enabled = engine_result.get('only_card_after_close', False)
-        hit_reason = engine_result.get('reason', '')
-
-        # 1. 发送禁止发货提示消息给买家
-        if block_reason and chat_id:
-            try:
-                await self._send_msg_with_retry(websocket, chat_id, buyer_id, block_reason)
-            except Exception as send_err:
-                logger.error(f'{pf}发送禁止发货提示消息异常: {self._safe_str(send_err)}')
-        elif not block_reason:
-            logger.info(f'{pf}规则 [{rule_name}] 未配置禁止发货原因，跳过发送消息: order_no={order_no}')
-        elif not chat_id:
-            logger.warning(f'{pf}缺少 chat_id，无法发送禁止发货提示: order_no={order_no}')
-
-        # 2. 写订单 delivery_fail_reason
-        fail_record = block_reason if block_reason else hit_reason
-        try:
-            await self._update_delivery_fail_reason(order_no, fail_record)
-        except Exception as record_err:
-            logger.warning(f'{pf}记录禁止发货原因到订单表失败: {self._safe_str(record_err)}')
-
-        # 3. 按开关关闭订单
-        order_closed = False
-        if auto_close_enabled:
-            try:
-                order_closed = await self.close_order_by_seller(order_no)
-                if not order_closed:
-                    logger.warning(f'{pf}禁止发货后关闭订单失败：order_no={order_no}')
-            except Exception as close_err:
-                logger.error(f'{pf}禁止发货后关闭订单异常: {self._safe_str(close_err)}')
-        else:
-            logger.info(f'{pf}规则 [{rule_name}] 未开启"主动关闭订单"，跳过关闭: order_no={order_no}')
-
-        # 4. 决定最终动作
-        if auto_close_enabled and order_closed and only_card_enabled:
-            action = 'card_only'
-            logger.warning(
-                f'{pf}❌ 命中规则 [{rule_name}] + 关闭订单成功 + 只发卡券：'
-                f'order_no={order_no}, buyer_id={buyer_id}, reason={fail_record}'
-            )
-        else:
-            action = 'block'
-            logger.warning(
-                f'{pf}❌ 命中规则 [{rule_name}]：order_no={order_no}, buyer_id={buyer_id}, '
-                f'reason={fail_record}, auto_close={auto_close_enabled}, '
-                f'order_closed={order_closed}, only_card={only_card_enabled}'
-            )
-
-        return {
-            'action': action,
-            'blocked': action == 'block',
-            'reason_text': block_reason,
-            'fail_record': fail_record,
-            'auto_close_enabled': auto_close_enabled,
-            'order_closed': order_closed,
-            'only_card_enabled': only_card_enabled,
-            'total_count': -1,
-            'rule_code': rule_code,
-            'rule_name': rule_name,
-            'buyer_fish_nick': self._current_buyer_fish_nick,
-        }
 
     # ==================== 卖家主动关闭订单 ====================
 

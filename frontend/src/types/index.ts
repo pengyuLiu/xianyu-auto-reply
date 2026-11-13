@@ -94,8 +94,13 @@ export interface Keyword {
   keyword: string
   reply: string
   item_id?: string      // 绑定的商品ID，空表示通用关键词
-  type?: 'text' | 'image' | 'item' | 'normal'  // 关键词类型
+  type?: 'text' | 'image' | 'external_contact' | 'item' | 'normal'  // 关键词类型
   image_url?: string    // 图片类型关键词的图片URL
+  location_name?: string
+  location_longitude?: string
+  location_latitude?: string
+  location_title?: string
+  location_subtitle?: string
   created_at?: string
   updated_at?: string
 }
@@ -257,6 +262,8 @@ export type ThemeSettings = ThemeAppearanceSettings & ThemeFontSettings
 export type PasswordLoginMode = 'protocol' | 'browser'
 export type SliderMode = 'browser' | 'real_mouse'
 export type TokenApiMode = 'web' | 'remote'
+export type PaymentChannel = 'alipay' | 'zzcode'
+export type ZzcodePayType = 'alipay' | 'wxpay' | 'qqpay'
 
 export interface SystemSettings {
   ai_model?: string
@@ -282,7 +289,7 @@ export interface SystemSettings {
   'theme.font_family'?: ThemeFontFamily
   // SMTP邮件配置
   smtp_server?: string
-  smtp_port?: number
+  smtp_port?: number | string
   smtp_user?: string
   smtp_password?: string
   smtp_from?: string
@@ -297,6 +304,14 @@ export interface SystemSettings {
   'alipay.alipay_public_key'?: string
   'alipay.gateway_url'?: string
   'alipay.notify_url'?: string
+  // 支付渠道与码支付配置
+  'payment.channel'?: PaymentChannel
+  'zzcode.pid'?: string
+  'zzcode.key'?: string
+  'zzcode.gateway'?: string
+  'zzcode.notify_url'?: string
+  'zzcode.return_url'?: string
+  'zzcode.pay_types'?: string
   // 提现配置
   'withdraw.notify_email'?: string
   'withdraw.min_amount'?: string
@@ -327,6 +342,7 @@ export interface SystemSettings {
 // API 响应类型
 export interface ApiResponse<T = unknown> {
   success: boolean
+  code?: number
   message?: string
   data?: T
   // 后端兼容字段
