@@ -11,7 +11,6 @@ import {
   Filter,
   Flower2,
   Image,
-  Info,
   Key,
   Layers,
   LayoutDashboard,
@@ -188,7 +187,6 @@ export const bottomNavItems: NavItem[] = [
   { key: 'feedback', icon: MessageSquarePlus, label: '意见反馈', path: '/feedback' },
   { key: 'ad-apply', icon: Image, label: '广告申请', path: '/ad-apply' },
   { key: 'disclaimer', icon: AlertTriangle, label: '免责声明', path: '/disclaimer' },
-  { key: 'about', icon: Info, label: '关于', path: '/about' },
 ]
 
 const hideableFirstLevelMenuOptions: FirstLevelMenuOption[] = [...mainNavItems, ...bottomNavItems]
