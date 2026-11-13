@@ -83,6 +83,13 @@ export function BasicSettingsTab({
               onChange={(checked) => setSettings((current) => current ? { ...current, 'account.face_verify_timeout_disable': checked } : null)}
               className="md:col-span-2"
             />
+            <ToggleSetting
+              title="展示广告"
+              description="关闭后仪表盘不再展示推荐/文字广告，并隐藏广告相关菜单"
+              checked={Boolean(settings?.['ads.enabled'] ?? false)}
+              onChange={(checked) => setSettings((current) => current ? { ...current, 'ads.enabled': checked } : null)}
+              className="md:col-span-2"
+            />
           </div>
 
           <PasswordLoginModeSetting

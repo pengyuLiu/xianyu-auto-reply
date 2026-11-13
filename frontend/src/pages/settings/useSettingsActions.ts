@@ -34,7 +34,7 @@ type SettingsGetter = () => SystemSettings | null
 
 export function useSettingsActions(getSettings: SettingsGetter) {
   const { addToast } = useUIStore()
-  const { setHiddenMenuKeys } = useMenuVisibilityStore()
+  const { setHiddenMenuKeys, setAdsEnabled } = useMenuVisibilityStore()
   const [savingKeys, setSavingKeys] = useState<Set<string>>(() => new Set())
 
   const persist = useCallback(async (payload: Partial<SystemSettings>, successMessage: string, failureMessage: string) => {
@@ -74,15 +74,17 @@ export function useSettingsActions(getSettings: SettingsGetter) {
       return
     }
     await run('basic', async () => {
-      await persist({
+      const saved = await persist({
         registration_enabled: Boolean(settings.registration_enabled),
         show_default_login_info: Boolean(settings.show_default_login_info),
         login_captcha_enabled: Boolean(settings.login_captcha_enabled ?? true),
         'log.retention_days': String(value),
         'account.face_verify_timeout_disable': Boolean(settings['account.face_verify_timeout_disable'] ?? true),
+        'ads.enabled': Boolean(settings['ads.enabled'] ?? false),
       }, '基础设置保存成功', '基础设置保存失败')
+      if (saved) setAdsEnabled(Boolean(settings['ads.enabled'] ?? false))
     })
-  }, [addToast, getSettings, persist, run])
+  }, [addToast, getSettings, persist, run, setAdsEnabled])
 
   const saveSmtp = useCallback(async () => {
     const settings = getSettings()
