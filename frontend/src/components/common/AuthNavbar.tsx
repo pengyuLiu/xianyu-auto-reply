@@ -7,7 +7,7 @@
  */
 import { Link, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { Home, Key, RefreshCw, Monitor, Menu, X, MessageSquare, Code2, Sun, Moon, Info, LogIn, Terminal } from 'lucide-react'
+import { Key, RefreshCw, Monitor, Menu, X, MessageSquare, Code2, Sun, Moon, LogIn } from 'lucide-react'
 import { getDefaultLoginBrandingSettings, LOGIN_BRANDING_UPDATED_EVENT } from '@/api/settings'
 import { getLoginBrandingSettings } from '@/api/auth'
 import type { LoginBrandingSettings } from '@/types'
@@ -21,13 +21,10 @@ const isOnlineEnv = () => {
 
 /** 导航菜单项定义 */
 const NAV_ITEMS = [
-  { path: '/', label: '首页', icon: Home, hideOnLocal: false },
-  { path: '/online-install', label: '在线安装', icon: Terminal, hideOnLocal: false },
   { path: '/get-activation', label: '获取激活码', icon: Key, hideOnLocal: true },
   { path: '/renew-activation', label: '激活码续期', icon: RefreshCw, hideOnLocal: true },
   { path: '/get-local-version', label: '获取本地版', icon: Monitor, hideOnLocal: true },
   { path: '/get-source-code', label: '获取源码', icon: Code2, hideOnLocal: true },
-  { path: '/about-public', label: '关于', icon: Info, hideOnLocal: false },
 ]
 
 interface AuthNavbarProps {
